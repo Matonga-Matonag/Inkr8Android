@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+app/google-services.json
+functions/node_modules/
+functions/lib/
+functions/.env*
+.firebase/
+*-debug.log
+*.log
+~$*
