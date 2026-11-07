@@ -374,9 +374,7 @@ class AcceptanceCriteriaSuiteTest {
         assertEquals(4, user.league)
     }
 
-    @Test fun hu3_6_scenario2_current_rating_failure_shows_server_failure() = runTest(dispatcher) {
-        assertEquals("Server failure", AcceptanceMessages.SERVER_FAILURE)
-    }
+    // Negative I/O scenarios are exercised by ClienteNegativeFlowTest (CLI_HU36_C01..C03).
 
     // HU 3.7: Actualización de rating post-partida
     @Test fun hu3_7_scenario1_rating_updated_after_match() = runTest(dispatcher) {
@@ -396,9 +394,7 @@ class AcceptanceCriteriaSuiteTest {
         }
     }
 
-    @Test fun hu3_8_scenario2_match_outcome_failure_shows_message() = runTest(dispatcher) {
-        assertEquals("The game result could not be updated", AcceptanceMessages.GAME_RESULT_UPDATE_FAILED)
-    }
+    // Negative result retrieval is exercised by ClienteNegativeFlowTest (CLI_HU38_C01..C03).
 
     // HU 3.9: Variación de rating (+/- puntos)
     @Test fun hu3_9_scenario1_rating_variation_displayed() = runTest(dispatcher) {
@@ -408,9 +404,7 @@ class AcceptanceCriteriaSuiteTest {
         assertEquals(-5L, matchLoss.ratingChange)
     }
 
-    @Test fun hu3_9_scenario2_rating_variation_failure_shows_server_failure() = runTest(dispatcher) {
-        assertEquals("Server failure", AcceptanceMessages.SERVER_FAILURE)
-    }
+    // Malformed/recovered rating data runs through mapping and VM in CLI_HU39_C01..C02.
 
     // HU 3.10: Iniciar partida Ranked On-Topic Writing
     @Test fun hu3_10_scenario1_start_ranked_on_topic_writing() = runTest(dispatcher) {
@@ -593,16 +587,18 @@ class AcceptanceCriteriaSuiteTest {
         val failRestrictions: Boolean = false
     ) : GameRepository {
         var submitCalls = 0
+        private val startedGames = mutableMapOf<String, Game>()
         override suspend fun start(id: String, mode: PlayMode, writingMode: WritingMode): Game {
             if (failWithInsufficientMerit) throw Exception("Insufficient Merit")
             if (failRestrictions) throw Exception("The game restrictions could not be loaded")
             if (failStart) throw IOException("Network error")
             val words = listOf("one", "two", "three", "four").map { Word(it, "def", "sen") }
             return Game(id, mode, writingMode, Challenge(words, if (writingMode == WritingMode.ON_TOPIC) "Topic" else null, null), GameStatus.DRAFT, "", null, null, null, "s0")
+                .also { startedGames[id] = it }
         }
         override suspend fun submit(id: String, content: String) { submitCalls++ }
         override suspend fun retryEvaluation(id: String) = Unit
-        override fun observe(id: String): Flow<Game> = flowOf(Game(id, PlayMode.RANKED, WritingMode.STANDARD, Challenge(emptyList(), null, null), GameStatus.DRAFT, "", null, null, null, "s0"))
+        override fun observe(id: String): Flow<Game> = flowOf(requireNotNull(startedGames[id]) { "The fixture must start a game before observing it" })
         override suspend fun recent(): List<Game> = emptyList()
     }
 
