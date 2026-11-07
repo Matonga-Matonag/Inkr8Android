@@ -1,0 +1,18 @@
+diff --git a/functions/src/data/repository/matchmaker.ts b/functions/src/data/repository/matchmaker.ts
+index 4665133c9213f2582472437d3edb33740e002c1d..64e751764be8a2cec3a894bb9894fa859dcb9054 100644
+--- a/functions/src/data/repository/matchmaker.ts
++++ b/functions/src/data/repository/matchmaker.ts
+@@ -14,7 +14,12 @@ export class Matchmaker {
+     if (own.get("matchStatus") !== "PENDING" || own.get("seasonIndex") !== season.index) return false;
+     const candidates = await this.db.collection("submissions").where("seasonIndex", "==", season.index)
+       .where("matchStatus", "==", "PENDING").orderBy("timestamp").limit(100).get();
+-    for (const candidate of candidates.docs) {
++    // Preserve priority between timestamps; distribute contention only within the oldest tied group.
++    const tied = candidates.docs.filter((candidate) => candidate.get("timestamp") === own.get("timestamp"));
++    const position = tied.findIndex((candidate) => candidate.id === id);
++    const preferred = candidates.docs[0]?.get("timestamp") === own.get("timestamp") && position >= 0 ? tied[position ^ 1] : undefined;
++    const ordered = preferred ? [preferred, ...candidates.docs.filter((candidate) => candidate.id !== preferred.id)] : candidates.docs;
++    for (const candidate of ordered) {
+       if (candidate.id === id || candidate.get("authorId") === own.get("authorId")) continue;
+       if (await this.pair(id, candidate.id, season)) return true;
+     }

@@ -1,0 +1,42 @@
+diff --git a/app/src/main/java/com/inkr8/presentation/viewmodel/GameViewModel.kt b/app/src/main/java/com/inkr8/presentation/viewmodel/GameViewModel.kt
+index 80451a30682e0458c9510bc0e43b3593bd6e52a2..6067f977ee7a16dac132eea3dca990bb5eff0067 100644
+--- a/app/src/main/java/com/inkr8/presentation/viewmodel/GameViewModel.kt
++++ b/app/src/main/java/com/inkr8/presentation/viewmodel/GameViewModel.kt
+@@ -137,7 +137,11 @@ class GameViewModel(
+                     text = if (game.status == GameStatus.DRAFT) it.text else game.content, error = null,
+                     resultNotice = if (game.status == GameStatus.EVALUATED && it.game?.status in listOf(GameStatus.PENDING, GameStatus.FAILED)) "Tu resultado está listo: ${game.evaluation?.score} puntos" else it.resultNotice) }
+             } } catch (error: CancellationException) { throw error }
+-            catch (error: Exception) { fail(error) }
++            catch (error: Exception) {
++                if (mode == PlayMode.RANKED && state.value.game?.status in listOf(GameStatus.PENDING, GameStatus.EVALUATED)) {
++                    updateState { it.copy(busy = false, error = AcceptanceMessages.GAME_RESULT_UPDATE_FAILED) }
++                } else fail(error)
++            }
+         }
+     }
+     fun refreshRecent() { viewModelScope.launch {
+diff --git a/app/src/main/java/com/inkr8/presentation/viewmodel/SessionViewModel.kt b/app/src/main/java/com/inkr8/presentation/viewmodel/SessionViewModel.kt
+index 8b3a2051a4cdf724953ae98c2b11d6272b9b3fba..e15eaf1a05f71d29f7960585bf320865c93619c4 100644
+--- a/app/src/main/java/com/inkr8/presentation/viewmodel/SessionViewModel.kt
++++ b/app/src/main/java/com/inkr8/presentation/viewmodel/SessionViewModel.kt
+@@ -27,12 +27,17 @@ class SessionViewModel(private val observeSession: ObserveSession, private val i
+         userJob?.cancel()
+         userJob = viewModelScope.launch {
+             mutableState.update { it.copy(loading = true, error = null) }
++            val user = try { initializeUser() }
++            catch (error: CancellationException) { throw error }
++            catch (error: Exception) {
++                mutableState.update { it.copy(loading = false, error = AcceptanceMessages.PROGRESS_RETRIEVE_FAILED) }
++                return@launch
++            }
++            mutableState.update { it.copy(user = user, loading = false) }
+             try {
+-                val user = initializeUser()
+-                mutableState.update { it.copy(user = user, loading = false) }
+                 observeUser(user.id).collect { updated -> mutableState.update { it.copy(user = updated, loading = false, error = null) } }
+             } catch (error: CancellationException) { throw error }
+-            catch (error: Exception) { mutableState.update { it.copy(loading = false, error = AcceptanceMessages.PROGRESS_RETRIEVE_FAILED) } }
++            catch (error: Exception) { mutableState.update { it.copy(loading = false, error = AcceptanceMessages.SERVER_FAILURE) } }
+         }
+     }
+     fun beginLogin() { mutableState.update { it.copy(loading = true, error = null) } }
