@@ -2,6 +2,19 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     id("com.google.gms.google-services")
+    jacoco
+}
+
+jacoco { toolVersion = "0.8.14" }
+tasks.register<JacocoReport>("jacocoDebugUnitTestReport") {
+    dependsOn("testDebugUnitTest")
+    executionData(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"))
+    sourceDirectories.setFrom(files("src/main/java"))
+    classDirectories.setFrom(files(
+        fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")),
+        fileTree(layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes"))
+    ))
+    reports { xml.required.set(true); html.required.set(true) }
 }
 // Firebase configuration is supplied by the owner; unconfigured debug builds show a setup error.
 val firebaseConfigured = file("google-services.json").exists()
@@ -15,6 +28,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
     }
     compileOptions {
@@ -56,4 +70,9 @@ dependencies {
     implementation(libs.coroutines.play.services)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
